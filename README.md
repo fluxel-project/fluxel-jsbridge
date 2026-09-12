@@ -58,11 +58,14 @@ mechanisms such as asset identity and diagnostic schemas belong to
 
 ## Status and roadmap
 
-**Status:** repository boundary established; no SDK package contract is
-released yet.
+**Status:** `@fluxel/browser` is the first deliberately narrow adapter. It
+creates one explicitly supplied WASM canvas session, owns RAF, CSS/DPR resize,
+visibility and WebGL context lifecycle, and forwards Rust diagnostics unchanged.
+It is not an SDK core and does not export scene, input, assets, audio, storage,
+or networking APIs.
 
-- Define the smallest browser/mini-game rendering integration after a real
-  rendering WASM slice exists.
+- Prove the browser adapter with the `fluxel-rendering-wasm` WebGL2 slice and
+  Chrome real-target evidence before calling it supported.
 - Establish the SDK core only from behavior shared by those adapters.
 - Add native-host adaptation after `fluxel-host` provides a concrete host API.
 - Keep every capability optional and observable as browser, mini-game, and

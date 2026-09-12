@@ -1,0 +1,16 @@
+{
+  "name": "fluxel-jsbridge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fluxel JavaScript platform adapters",
+  "license": "MIT",
+  "repository": "https://github.com/fluxel-project/fluxel-jsbridge",
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "node --test packages/browser/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

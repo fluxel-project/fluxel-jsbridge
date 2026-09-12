@@ -1,0 +1,17 @@
+{
+  "name": "@fluxel/browser",
+  "version": "0.1.0",
+  "description": "Minimal browser lifecycle adapter for fluxel-rendering-wasm",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fluxel-project/fluxel-jsbridge.git",
+    "directory": "packages/browser"
+  },
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": ["src", "README.md"],
+  "engines": {
+    "node": ">=20"
+  }
+}
