@@ -1,7 +1,7 @@
 {
   "name": "fluxel-jsbridge",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Fluxel JavaScript platform adapters",
   "license": "MIT",
   "repository": "https://github.com/fluxel-project/fluxel-jsbridge",

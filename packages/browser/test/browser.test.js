@@ -223,6 +223,8 @@ test("requestFrame is a one-shot command and lastFrameReport is a pure query", (
     assert.deepEqual(adapter.lastFrameReport(), null);
     assert.deepEqual(adapter.requestFrame(), { outcome: "scheduled" });
     assert.equal(browser.pending.size, 1);
+    assert.deepEqual(adapter.requestFrame(), { outcome: "already-scheduled" });
+    assert.equal(browser.pending.size, 1);
     assert.equal(calls.filter(([kind]) => kind === "render").length, 0);
     browser.runOneFrame();
     assert.equal(calls.filter(([kind]) => kind === "render").length, 1);

@@ -188,6 +188,9 @@ function createDomAdapter({ canvas, session, kind }) {
       const reason = submissionBlockReason();
       if (reason) return outcome("blocked", reason);
       if (running) return outcome("already-running");
+      // This is a coalescing command, not a counter: one pending RAF already
+      // represents the requested one-shot submission opportunity.
+      if (singleFrameRequested) return outcome("already-scheduled");
       singleFrameRequested = true;
       scheduleFrame();
       return outcome("scheduled");

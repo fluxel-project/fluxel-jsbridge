@@ -68,10 +68,11 @@ or networking APIs.
 
 - Prove the browser adapter with the `fluxel-rendering-wasm` WebGL2 slice and
   Chrome real-target evidence before calling it supported.
-- `@fluxel/browser` **v0.3.0** is its contribution to the ecosystem 0.11
-  Architecture Closure: command/query separation, sole Rust/WASM drawing-buffer
-  mutation, and lifecycle CI. It adds no renderer feature or broader platform
-  support claim.
+- `@fluxel/browser` **v0.3.1** is the 0.11 compatibility patch: repeated
+  pending one-shot requests report `already-scheduled`, making the existing
+  coalescing behavior explicit. The 0.11 contribution remains command/query
+  separation, sole Rust/WASM drawing-buffer mutation, and lifecycle CI; it adds
+  no renderer feature or broader platform support claim.
 - The named Chrome Stable / Windows x64 / AMD Stage 2.2 WebGPU evidence target
   remains the historical **v0.2.0** fact: retained three-object scene, async
   device-loss recovery, terminal disposal, resize, and visibility lifecycle.
