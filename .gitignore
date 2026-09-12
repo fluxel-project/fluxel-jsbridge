@@ -1,2 +1,3 @@
 packages/browser/demo/wasm/
 *.tgz
+node_modules/

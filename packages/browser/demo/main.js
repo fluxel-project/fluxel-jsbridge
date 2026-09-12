@@ -19,19 +19,12 @@ async function snapshot() {
   const drawable = canvas.width > 0 && canvas.height > 0 && !gl?.isContextLost()
     && document.visibilityState !== "hidden";
   let report = null;
-  let blockedError = null;
-  try {
-    report = renderer.renderOnce();
-    if (drawable && report?.outcome !== "submitted") {
-      for (let attempt = 0; attempt < 8 && report?.outcome !== "submitted"; attempt += 1) {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        report = renderer.renderOnce();
-      }
-    }
-  } catch (error) {
-    blockedError = error;
+  for (let attempt = 0; drawable && report?.outcome !== "submitted" && attempt < 8; attempt += 1) {
+    report = renderer.lastFrameReport();
+    if (report?.outcome === "submitted") break;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }
-  const blocked = !drawable && report?.outcome === "blocked" && blockedError === null;
+  const blocked = !drawable && report === null;
   const keyColors = drawable ? [
     { name: "clear", expected: [0, 0, 0, 255], actual: readPixel(gl, canvas, 0.05, 0.05) },
     { name: "red", expected: [255, 0, 0, 255], actual: readPixel(gl, canvas, 0.275, 0.325) },
@@ -43,7 +36,6 @@ async function snapshot() {
   return Object.freeze({
     report: blocked ? null : report,
     blocked,
-    blockedError,
     diagnostics: renderer.diagnosticsSnapshot(),
     errors: webglError === 0 ? [] : [`WebGL error 0x${webglError.toString(16)}`],
     keyColors,
