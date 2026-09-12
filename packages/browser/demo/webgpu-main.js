@@ -40,23 +40,15 @@ async function snapshot() {
   const drawable = canvas.width > 0 && canvas.height > 0
     && facts.state === "Active" && document.visibilityState !== "hidden";
   let report = null;
-  let blockedError = null;
-  try {
-    report = renderer.renderOnce();
-    if (drawable && report?.outcome !== "submitted") {
-      for (let attempt = 0; attempt < 12 && report?.outcome !== "submitted"; attempt += 1) {
-        await nextFrame();
-        report = renderer.renderOnce();
-      }
-    }
-  } catch (error) {
-    blockedError = error;
+  for (let attempt = 0; drawable && report?.outcome !== "submitted" && attempt < 12; attempt += 1) {
+    report = renderer.lastFrameReport();
+    if (report?.outcome === "submitted") break;
+    await nextFrame();
   }
-  const blocked = !drawable && report?.outcome === "blocked" && blockedError === null;
+  const blocked = !drawable && report === null;
   return Object.freeze({
     report: blocked ? null : report,
     blocked,
-    blockedError,
     diagnostics: renderer.diagnosticsSnapshot(),
     errors: [],
     // WebGPU canvas serialization is not a stable readback oracle. The Python

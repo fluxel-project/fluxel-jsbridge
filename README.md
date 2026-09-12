@@ -68,15 +68,15 @@ or networking APIs.
 
 - Prove the browser adapter with the `fluxel-rendering-wasm` WebGL2 slice and
   Chrome real-target evidence before calling it supported.
-- `@fluxel/browser` **v0.2.0** is the Stage 2.2 WebGPU target: a named Chrome
-  Stable run on Windows x64 with the named AMD adapter, using the retained
-  three-object scene, async device-loss recovery, and async terminal disposal.
-  This is a deliberately narrow evidence slice, not generic WebGPU browser,
-  device, adapter, or platform support.
-- Its release evidence must record the exact browser/OS/adapter context and
-  exercise visible rendering, resize, suspend/restore, loss/recovery, and
-  disposal. Until that evidence and release exist, this target is not a support
-  claim or a portability promise.
+- `@fluxel/browser` **v0.3.0** is its contribution to the ecosystem 0.11
+  Architecture Closure: command/query separation, sole Rust/WASM drawing-buffer
+  mutation, and lifecycle CI. It adds no renderer feature or broader platform
+  support claim.
+- The named Chrome Stable / Windows x64 / AMD Stage 2.2 WebGPU evidence target
+  remains the historical **v0.2.0** fact: retained three-object scene, async
+  device-loss recovery, terminal disposal, resize, and visibility lifecycle.
+  It is deliberately narrow, not a generic WebGPU browser, device, adapter, or
+  platform support claim.
 - Establish the SDK core only from behavior shared by those adapters.
 - Add native-host adaptation after `fluxel-host` provides a concrete host API.
 - Keep every capability optional and observable as browser, mini-game, and

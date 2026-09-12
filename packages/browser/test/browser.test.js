@@ -108,15 +108,15 @@ function fakeWebGpuWasm(calls, recovery) {
   return { WebGpuSession: { async create(canvas) { calls.push(["create", canvas]); return session; } }, session };
 }
 
-test("converts CSS/DPR extents and owns one idempotent RAF loop", () => {
+test("reports CSS/DPR extent to Rust/WASM and owns one idempotent RAF loop", () => {
   const browser = installBrowser();
   try {
     const calls = [];
     const canvas = fakeCanvas();
     const adapter = createFluxelBrowserRenderer({ canvas, wasm: fakeWasm(calls) });
     assert.deepEqual(calls.slice(0, 2), [["create", canvas], ["resize", 200, 100]]);
-    assert.equal(canvas.width, 200);
-    assert.equal(canvas.height, 100);
+    assert.equal(canvas.width, 100);
+    assert.equal(canvas.height, 50);
 
     adapter.start();
     adapter.start();
@@ -214,28 +214,35 @@ test("a structured backpressure outcome preserves RAF ownership without hiding t
   } finally { browser.restore(); }
 });
 
-test("public renderOnce observes the last RAF report and reports blocked states without submitting", () => {
+test("requestFrame is a one-shot command and lastFrameReport is a pure query", () => {
   const browser = installBrowser();
   try {
     const calls = [];
     const canvas = fakeCanvas();
     const adapter = createFluxelBrowserRenderer({ canvas, wasm: fakeWasm(calls) });
-    adapter.start();
+    assert.deepEqual(adapter.lastFrameReport(), null);
+    assert.deepEqual(adapter.requestFrame(), { outcome: "scheduled" });
+    assert.equal(browser.pending.size, 1);
+    assert.equal(calls.filter(([kind]) => kind === "render").length, 0);
     browser.runOneFrame();
-    const submitted = calls.filter(([kind]) => kind === "render").length;
-    assert.equal(submitted, 1);
-    assert.deepEqual(adapter.renderOnce(), { frame: 1 });
-    assert.equal(calls.filter(([kind]) => kind === "render").length, submitted);
+    assert.equal(calls.filter(([kind]) => kind === "render").length, 1);
+    assert.deepEqual(adapter.lastFrameReport(), { frame: 1 });
+    assert.equal(browser.pending.size, 0);
+
+    adapter.start();
+    assert.deepEqual(adapter.requestFrame(), { outcome: "already-running" });
+    assert.equal(calls.filter(([kind]) => kind === "render").length, 1);
 
     adapter.suspend();
-    assert.deepEqual(adapter.renderOnce(), { outcome: "blocked" });
-    assert.equal(calls.filter(([kind]) => kind === "render").length, submitted);
+    assert.deepEqual(adapter.requestFrame(), { outcome: "blocked", reason: "suspended" });
 
-    adapter.resume();
+    // Stop the continuous producer, then verify an unavailable one-shot has a
+    // structured outcome and never becomes a query or direct submission.
+    const stopped = createFluxelBrowserRenderer({ canvas: fakeCanvas(), wasm: fakeWasm(calls) });
+    stopped.suspend();
+    assert.deepEqual(stopped.requestFrame(), { outcome: "blocked", reason: "suspended" });
     browser.documentTarget.visibilityState = "hidden";
-    browser.documentTarget.dispatch("visibilitychange");
-    assert.deepEqual(adapter.renderOnce(), { outcome: "blocked" });
-    assert.equal(calls.filter(([kind]) => kind === "render").length, submitted);
+    assert.deepEqual(stopped.requestFrame(), { outcome: "blocked", reason: "suspended" });
   } finally { browser.restore(); }
 });
 
@@ -255,6 +262,7 @@ test("WebGPU recovery has one producer, coalesces lifecycle events, and register
     await Promise.resolve();
     assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
     assert.equal(browser.pending.size, 0);
+    assert.deepEqual(adapter.requestFrame(), { outcome: "blocked", reason: "recovering" });
 
     canvas.clientWidth = 140;
     browser.resize();
@@ -292,6 +300,7 @@ test("WebGPU disposal caches one Promise and stale recovery cannot revive RAF", 
     const first = adapter.dispose();
     const second = adapter.dispose();
     assert.strictEqual(first, second);
+    assert.deepEqual(adapter.requestFrame(), { outcome: "terminal", reason: "disposed" });
     assert.equal(canvas.count("webglcontextlost"), 0);
     assert.equal(browser.documentTarget.count("visibilitychange"), 0);
     recovery.resolve({ state: "ready" });
@@ -313,17 +322,20 @@ test("WebGPU recovery failure remains observable and stops submission", async ()
     adapter.start();
     browser.runOneFrame();
     await Promise.resolve();
-    recovery.reject(new Error("recover failed"));
+    const failure = new Error("recover failed");
+    recovery.reject(failure);
     await settlePromises();
     assert.equal(browser.pending.size, 0);
-    assert.throws(() => adapter.renderOnce(), /recover failed/);
+    const terminal = adapter.requestFrame();
+    assert.deepEqual(terminal, { outcome: "terminal", reason: "recovery-failed", error: failure });
+    assert.strictEqual(terminal.error, failure);
     adapter.resume();
     adapter.resize();
     adapter.start();
     await settlePromises();
     assert.equal(browser.pending.size, 0);
     assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
-    assert.throws(() => adapter.renderOnce(), /recover failed/);
+    assert.strictEqual(adapter.requestFrame().error, failure);
   } finally { browser.restore(); }
 });
 

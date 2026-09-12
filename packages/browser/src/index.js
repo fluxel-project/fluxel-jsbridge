@@ -32,7 +32,8 @@ function createDomAdapter({ canvas, session, kind }) {
   const windowTarget = globalThis;
   let frameRequest = null;
   let disposed = false;
-  let wanted = false;
+  let running = false;
+  let singleFrameRequested = false;
   let manuallySuspended = false;
   let contextLost = false;
   let drawable = true;
@@ -44,7 +45,22 @@ function createDomAdapter({ canvas, session, kind }) {
   let lifecycleToken = 0;
 
   const isVisible = () => documentTarget?.visibilityState !== "hidden";
-  const shouldTick = () => !disposed && !recoveryPending && !recoveryError && wanted && !manuallySuspended && !contextLost && drawable && isVisible();
+  const submissionBlockReason = () => {
+    if (disposed) return "disposed";
+    if (recoveryError) return "recovery-failed";
+    if (recoveryPending) return "recovering";
+    if (manuallySuspended) return "suspended";
+    if (contextLost) return "context-lost";
+    if (!drawable) return "zero-sized";
+    if (!isVisible()) return "hidden";
+    return null;
+  };
+  const shouldTick = () => (running || singleFrameRequested) && submissionBlockReason() === null;
+  const outcome = (kind, reason, error) => Object.freeze({
+    outcome: kind,
+    ...(reason ? { reason } : {}),
+    ...(error ? { error } : {}),
+  });
   const cancelFrame = () => {
     if (frameRequest !== null) {
       globalThis.cancelAnimationFrame?.(frameRequest);
@@ -57,13 +73,17 @@ function createDomAdapter({ canvas, session, kind }) {
     frameRequest = globalThis.requestAnimationFrame(() => {
       frameRequest = null;
       if (!shouldTick()) return;
+      // Consume the one-shot demand before crossing into Rust: a re-entrant
+      // callback cannot turn it into a second producer.
+      const oneShot = singleFrameRequested;
+      if (oneShot) singleFrameRequested = false;
       const report = session.render_once();
       lastReport = report;
       if (isWebGpu && report?.outcome === "device-lost") {
         beginRecovery();
         return;
       }
-      scheduleFrame();
+      if (running) scheduleFrame();
     });
   };
   const beginRecovery = () => {
@@ -87,8 +107,8 @@ function createDomAdapter({ canvas, session, kind }) {
         throw error;
       },
     );
-    // RAF has no promise consumer. Keep the Rust error structured and
-    // observable via renderOnce() without creating an unhandled rejection.
+    // RAF has no promise consumer. Keep the Rust error in terminal adapter
+    // state without creating an unhandled rejection.
     recoveryPending.catch(() => {});
     recoveryPending.then(() => {
       if (token === lifecycleToken && !disposed) scheduleFrame();
@@ -96,16 +116,15 @@ function createDomAdapter({ canvas, session, kind }) {
     return recoveryPending;
   };
   const resize = () => {
-    if (disposed) return session.resize(0, 0);
+    if (disposed) return outcome("terminal", "disposed");
     const css = canvasCssExtent(canvas);
     const dpr = Number(globalThis.devicePixelRatio) || 1;
     const width = nonNegativePixel(css.width * dpr);
     const height = nonNegativePixel(css.height * dpr);
     drawable = width > 0 && height > 0;
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
-    // During recovery Rust only coalesces desired extent; no RAF may be made.
-    const report = session.resize(canvas.width, canvas.height);
+    // JavaScript reports desired CSS × DPR extent only. Rust/WASM is the sole
+    // drawing-buffer mutator, including zero-size and recovery coalescing.
+    const report = session.resize(width, height);
     lastReport = null;
     if (drawable) scheduleFrame(); else cancelFrame();
     return report;
@@ -159,18 +178,22 @@ function createDomAdapter({ canvas, session, kind }) {
   return Object.freeze({
     start() {
       if (disposed) return disposal;
-      wanted = true;
+      running = true;
       scheduleFrame();
     },
     resize,
-    renderOnce() {
-      if (recoveryError) throw recoveryError;
-      if (wanted) {
-        if (!shouldTick()) return Object.freeze({ outcome: "blocked" });
-        return lastReport;
-      }
-      return session.render_once();
+    requestFrame() {
+      if (disposed) return outcome("terminal", "disposed");
+      if (recoveryError) return outcome("terminal", "recovery-failed", recoveryError);
+      const reason = submissionBlockReason();
+      if (reason) return outcome("blocked", reason);
+      if (running) return outcome("already-running");
+      singleFrameRequested = true;
+      scheduleFrame();
+      return outcome("scheduled");
     },
+    // This is intentionally a query: it never submits or schedules work.
+    lastFrameReport() { return lastReport; },
     suspend(_reason = "manual") {
       if (disposed) return disposal;
       manuallySuspended = true;
@@ -195,6 +218,8 @@ function createDomAdapter({ canvas, session, kind }) {
     dispose() {
       if (disposed) return disposal;
       disposed = true;
+      running = false;
+      singleFrameRequested = false;
       ++lifecycleToken;
       cancelFrame();
       observer?.disconnect();
