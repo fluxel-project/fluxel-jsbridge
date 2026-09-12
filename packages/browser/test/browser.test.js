@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFluxelBrowserRenderer } from "../src/index.js";
+import { createFluxelBrowserRenderer, createFluxelWebGpuBrowserRenderer } from "../src/index.js";
 
 class Target {
   #listeners = new Map();
@@ -82,6 +82,30 @@ function fakeWasm(calls) {
     dispose() { calls.push(["dispose"]); return { state: "disposed" }; },
   };
   return { createSession(canvas) { calls.push(["create", canvas]); return session; } };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; });
+  return { promise, resolve, reject };
+}
+
+function settlePromises() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+function fakeWebGpuWasm(calls, recovery) {
+  const session = {
+    resize(width, height) { calls.push(["resize", width, height]); },
+    render_once() { calls.push(["render"]); return { outcome: "submitted" }; },
+    suspend() { calls.push(["suspend"]); },
+    resume() { calls.push(["resume"]); },
+    recover() { calls.push(["recover"]); return recovery.promise; },
+    diagnostics_snapshot() { return []; },
+    dispose() { calls.push(["dispose"]); return Promise.resolve({ state: "disposed" }); },
+  };
+  return { WebGpuSession: { async create(canvas) { calls.push(["create", canvas]); return session; } }, session };
 }
 
 test("converts CSS/DPR extents and owns one idempotent RAF loop", () => {
@@ -212,5 +236,110 @@ test("public renderOnce observes the last RAF report and reports blocked states 
     browser.documentTarget.dispatch("visibilitychange");
     assert.deepEqual(adapter.renderOnce(), { outcome: "blocked" });
     assert.equal(calls.filter(([kind]) => kind === "render").length, submitted);
+  } finally { browser.restore(); }
+});
+
+test("WebGPU recovery has one producer, coalesces lifecycle events, and registers no WebGL listeners", async () => {
+  const browser = installBrowser();
+  try {
+    const calls = [];
+    const recovery = deferred();
+    const canvas = fakeCanvas();
+    const wasm = fakeWebGpuWasm(calls, recovery);
+    wasm.session.render_once = () => { calls.push(["render", "lost"]); return { outcome: "device-lost" }; };
+    const adapter = await createFluxelWebGpuBrowserRenderer({ canvas, wasm });
+    assert.equal(canvas.count("webglcontextlost"), 0);
+    assert.equal(canvas.count("webglcontextrestored"), 0);
+    adapter.start();
+    browser.runOneFrame();
+    await Promise.resolve();
+    assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
+    assert.equal(browser.pending.size, 0);
+
+    canvas.clientWidth = 140;
+    browser.resize();
+    browser.documentTarget.visibilityState = "hidden";
+    browser.documentTarget.dispatch("visibilitychange");
+    browser.documentTarget.visibilityState = "visible";
+    browser.documentTarget.dispatch("visibilitychange");
+    adapter.suspend("during-recovery");
+    adapter.resume();
+    adapter.start();
+    assert.equal(browser.pending.size, 0);
+    assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
+    assert.equal(calls.filter(([kind]) => kind === "resume").length, 0);
+    assert.equal(calls.filter(([kind]) => kind === "suspend").length, 0);
+
+    recovery.resolve({ state: "ready" });
+    await settlePromises();
+    assert.equal(browser.pending.size, 1);
+    assert.deepEqual(calls.filter(([kind]) => kind === "resize").at(-1), ["resize", 280, 100]);
+  } finally { browser.restore(); }
+});
+
+test("WebGPU disposal caches one Promise and stale recovery cannot revive RAF", async () => {
+  const browser = installBrowser();
+  try {
+    const calls = [];
+    const recovery = deferred();
+    const canvas = fakeCanvas();
+    const wasm = fakeWebGpuWasm(calls, recovery);
+    wasm.session.render_once = () => ({ outcome: "device-lost" });
+    const adapter = await createFluxelWebGpuBrowserRenderer({ canvas, wasm });
+    adapter.start();
+    browser.runOneFrame();
+    await Promise.resolve();
+    const first = adapter.dispose();
+    const second = adapter.dispose();
+    assert.strictEqual(first, second);
+    assert.equal(canvas.count("webglcontextlost"), 0);
+    assert.equal(browser.documentTarget.count("visibilitychange"), 0);
+    recovery.resolve({ state: "ready" });
+    await settlePromises();
+    await first;
+    assert.equal(browser.pending.size, 0);
+    assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
+  } finally { browser.restore(); }
+});
+
+test("WebGPU recovery failure remains observable and stops submission", async () => {
+  const browser = installBrowser();
+  try {
+    const calls = [];
+    const recovery = deferred();
+    const wasm = fakeWebGpuWasm(calls, recovery);
+    wasm.session.render_once = () => ({ outcome: "device-lost" });
+    const adapter = await createFluxelWebGpuBrowserRenderer({ canvas: fakeCanvas(), wasm });
+    adapter.start();
+    browser.runOneFrame();
+    await Promise.resolve();
+    recovery.reject(new Error("recover failed"));
+    await settlePromises();
+    assert.equal(browser.pending.size, 0);
+    assert.throws(() => adapter.renderOnce(), /recover failed/);
+    adapter.resume();
+    adapter.resize();
+    adapter.start();
+    await settlePromises();
+    assert.equal(browser.pending.size, 0);
+    assert.equal(calls.filter(([kind]) => kind === "recover").length, 1);
+    assert.throws(() => adapter.renderOnce(), /recover failed/);
+  } finally { browser.restore(); }
+});
+
+test("WebGPU factory propagates async Rust initialization rejection without DOM listeners", async () => {
+  const browser = installBrowser();
+  try {
+    const canvas = fakeCanvas();
+    const failure = new Error("no adapter");
+    await assert.rejects(
+      createFluxelWebGpuBrowserRenderer({
+        canvas,
+        wasm: { WebGpuSession: { create: async () => { throw failure; } } },
+      }),
+      failure,
+    );
+    assert.equal(canvas.count("webglcontextlost"), 0);
+    assert.equal(browser.documentTarget.count("visibilitychange"), 0);
   } finally { browser.restore(); }
 });

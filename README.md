@@ -60,12 +60,23 @@ mechanisms such as asset identity and diagnostic schemas belong to
 
 **Status:** `@fluxel/browser` is the first deliberately narrow adapter. It
 creates one explicitly supplied WASM canvas session, owns RAF, CSS/DPR resize,
-visibility and WebGL context lifecycle, and forwards Rust diagnostics unchanged.
+visibility, and WebGL2 or WebGPU lifecycle. WebGPU initialization, loss
+recovery, and terminal disposal stay in the async Rust/WASM capsule; the
+adapter never owns GPU objects. It forwards Rust diagnostics unchanged.
 It is not an SDK core and does not export scene, input, assets, audio, storage,
 or networking APIs.
 
 - Prove the browser adapter with the `fluxel-rendering-wasm` WebGL2 slice and
   Chrome real-target evidence before calling it supported.
+- `@fluxel/browser` **v0.2.0** is the Stage 2.2 WebGPU target: a named Chrome
+  Stable run on Windows x64 with the named AMD adapter, using the retained
+  three-object scene, async device-loss recovery, and async terminal disposal.
+  This is a deliberately narrow evidence slice, not generic WebGPU browser,
+  device, adapter, or platform support.
+- Its release evidence must record the exact browser/OS/adapter context and
+  exercise visible rendering, resize, suspend/restore, loss/recovery, and
+  disposal. Until that evidence and release exist, this target is not a support
+  claim or a portability promise.
 - Establish the SDK core only from behavior shared by those adapters.
 - Add native-host adaptation after `fluxel-host` provides a concrete host API.
 - Keep every capability optional and observable as browser, mini-game, and

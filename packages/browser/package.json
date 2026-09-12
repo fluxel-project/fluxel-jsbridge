@@ -1,7 +1,7 @@
 {
   "name": "@fluxel/browser",
-  "version": "0.1.0",
-  "description": "Minimal browser lifecycle adapter for fluxel-rendering-wasm",
+  "version": "0.2.0",
+  "description": "Minimal WebGL2 and WebGPU browser lifecycle adapters for fluxel-rendering-wasm",
   "license": "MIT",
   "repository": {
     "type": "git",
