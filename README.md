@@ -1,87 +1,58 @@
-# Fluxel JS Bridge
+# Fluxel JavaScript Bridge
 
-`fluxel-jsbridge` is the default JavaScript SDK monorepo for Fluxel. It gives
-browser, mini-game, and native-host applications one developer-facing API while
-adapting each environment's services and connecting to the Fluxel rendering
-kernel.
+`fluxel-jsbridge` contains JavaScript-facing platform adapters for Fluxel.
+Its adapters translate browser, mini-game, or native-host lifecycle and
+capability facts into the contracts consumed by an application and by
+`fluxel-rendering`. It is not a renderer, RHI, asset system, or native host.
 
-It is an integration layer, not the semantic authority for rendering, assets,
-diagnostics, or platform services. The same lower-level contracts may be
-presented by a Rust, C#, Lua, or other language SDK without changing their
-meaning.
+The repository currently ships the deliberately narrow
+[`@fluxel/browser`](./packages/browser/README.md) adapter. A general JavaScript
+SDK is introduced only when behaviour is genuinely shared by more than one
+adapter; this repository does not predeclare a universal application API.
 
-## Repository outline
+## Responsibilities and boundaries
 
-The repository will grow packages only when a vertical slice proves their
-boundary:
-
-| Package area | Responsibility |
+| Owner | Responsibility |
 | --- | --- |
-| SDK core | The stable, language-level application API and composition of rendering with host services. |
-| Browser adapter | Web APIs, the rendering WASM module, and browser diagnostics. |
-| Mini-game adapter | A selected mini-game platform's APIs and its rendering WASM integration. |
-| Native adapter | The API injected or exposed by a Fluxel native host. |
+| `fluxel-jsbridge` | JavaScript-facing platform adaptation: canvas and DOM lifecycle, resize and visibility facts, platform capability discovery, and JavaScript diagnostic sinks. |
+| [`fluxel-rendering`](https://github.com/fluxel-project/fluxel-rendering) | RenderGraph, renderer, RHI, presentation, GPU resources, command submission, completion, and GPU retirement. |
+| [`fluxel-host`](https://github.com/fluxel-project/fluxel-host) | Native process and window lifecycle, event pumping, and platform I/O for native applications. Its platform crates do not depend on rendering. |
+| [`fluxel-bases`](https://github.com/fluxel-project/fluxel-bases) | Platform-neutral mechanisms that real cross-repository consumers have proved should be shared. |
 
-The adapters translate environment-specific capabilities; they do not pretend
-that every platform has identical services.
+An adapter owns platform lifecycle reduction, not GPU execution resources. For
+example, the browser adapter observes the supplied canvas, CSS/DPR extent,
+visibility, and browser loss/restoration events, then passes those facts to the
+rendering binding. RHI remains the single owner of GPU buffers, textures,
+commands, submission, completion, and retirement. Browser-native GPU objects
+and any binding-private handles are implementation details, never a Fluxel
+public architecture or a cross-platform resource model.
 
-## Dependencies and contracts
+`fluxel-host` and `fluxel-jsbridge` are peers that serve different platforms.
+Native applications may compose a host with rendering; browser and mini-game
+applications use a JavaScript adapter with a rendering binding. Neither choice
+makes platform lifecycle the owner of rendering semantics.
 
-`fluxel-jsbridge` consumes either a Fluxel rendering WASM/native binding or a
-Fluxel host API. `fluxel-rendering` remains a host-agnostic rendering kernel:
-it accepts a supplied surface target, resource bytes, scene/canvas updates, and
-render calls, but does not own a main loop, input, IO, audio, storage, or
-networking. A native host supplies those services when an executable, APK, or
-IPA is required.
+## Package layout
 
-The SDK composes those contracts into familiar application services such as
-`app.scene`, `app.canvas`, `app.assets`, `app.input`, `app.audio`,
-`app.video`, `app.storage`, and `app.net`. It must expose capability
-discovery rather than manufacture unsupported behavior:
+| Package area | Status | Responsibility |
+| --- | --- | --- |
+| `@fluxel/browser` | Existing | Browser canvas/DOM lifecycle adapter around an explicitly supplied rendering WASM binding. |
+| SDK core | Deferred | A language-level API only after multiple adapters establish a shared contract. |
+| Mini-game adapter | Deferred | An adapter for a specifically supported mini-game platform. |
+| Native adapter | Deferred | JavaScript adaptation over a concrete native-host bridge contract. |
 
-```js
-if (app.capabilities.video) {
-  await app.video.play(source);
-}
-```
+Platform services are capability-specific. An eventual common SDK must expose
+what the selected adapter actually supports rather than emulate unavailable
+input, audio, storage, video, or networking behaviour.
 
-## Non-goals
+## Development boundary
 
-This repository does not define GPU resource ownership, native RHI behavior,
-or the portable renderer contract; those belong to
-[`fluxel-rendering`](https://github.com/fluxel-project/fluxel-rendering).
-It does not create native application hosts, own OS lifecycle policy, or
-implement platform filesystem, audio, video, storage, and network backends.
-Those responsibilities belong to `fluxel-host`. Shared, platform-neutral
-mechanisms such as asset identity and diagnostic schemas belong to
-`fluxel-bases` when their cross-repository contracts are proven.
+The dependency direction is from JavaScript platform adaptation toward the
+rendering binding. The bridge may supply a presentation target and lifecycle
+facts, but it must not define scenes, RenderGraph semantics, RHI resources,
+GPU synchronization, or renderer-private residency. Conversely, rendering
+does not own RAF, DOM events, browser policy, or a native application loop.
 
-## Status and roadmap
-
-**Status:** `@fluxel/browser` is the first deliberately narrow adapter. It
-creates one explicitly supplied WASM canvas session, owns RAF, CSS/DPR resize,
-visibility, and WebGL2 or WebGPU lifecycle. WebGPU initialization, loss
-recovery, and terminal disposal stay in the async Rust/WASM capsule; the
-adapter never owns GPU objects. It forwards Rust diagnostics unchanged.
-It is not an SDK core and does not export scene, input, assets, audio, storage,
-or networking APIs.
-
-- Prove the browser adapter with the `fluxel-rendering-wasm` WebGL2 slice and
-  Chrome real-target evidence before calling it supported.
-- `@fluxel/browser` **v0.3.1** is the 0.11 compatibility patch: repeated
-  pending one-shot requests report `already-scheduled`, making the existing
-  coalescing behavior explicit. The 0.11 contribution remains command/query
-  separation, sole Rust/WASM drawing-buffer mutation, and lifecycle CI; it adds
-  no renderer feature or broader platform support claim.
-- The named Chrome Stable / Windows x64 / AMD Stage 2.2 WebGPU evidence target
-  remains the historical **v0.2.0** fact: retained three-object scene, async
-  device-loss recovery, terminal disposal, resize, and visibility lifecycle.
-  It is deliberately narrow, not a generic WebGPU browser, device, adapter, or
-  platform support claim.
-- Establish the SDK core only from behavior shared by those adapters.
-- Add native-host adaptation after `fluxel-host` provides a concrete host API.
-- Keep every capability optional and observable as browser, mini-game, and
-  native support diverge.
-
-For the ecosystem-wide ownership and stage plan, see the
-[Fluxel roadmap](https://github.com/fluxel-project/.github/blob/main/ROADMAP.md).
+For ecosystem ownership and the current development sequence, see the
+[Fluxel roadmap](https://github.com/fluxel-project/.github/blob/main/ROADMAP.md)
+and [ecosystem architecture](https://github.com/fluxel-project/.github/blob/main/ECOSYSTEM_ARCHITECTURE.md).

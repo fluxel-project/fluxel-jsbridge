@@ -1,78 +1,76 @@
 # `@fluxel/browser`
 
-This ESM package is the Stage 2 browser lifecycle adapter, not a JavaScript
-renderer or SDK core.
+`@fluxel/browser` is a narrow browser lifecycle adapter for a supplied Fluxel
+rendering WASM binding. It is neither a JavaScript renderer nor a general SDK.
+It owns browser-side lifecycle reduction and the sole `requestAnimationFrame`
+producer; the rendering binding owns GPU execution and drawing-buffer changes.
+
+## Use
 
 ```js
-import { createFluxelBrowserRenderer, createFluxelWebGpuBrowserRenderer } from "@fluxel/browser";
+import {
+  createFluxelBrowserRenderer,
+  createFluxelWebGpuBrowserRenderer,
+} from "@fluxel/browser";
 
 const renderer = createFluxelBrowserRenderer({ canvas, wasm });
 renderer.start();
 ```
 
-For the asynchronous WebGPU capsule, use the separately explicit factory:
+Use the asynchronous factory when the supplied binding exposes the WebGPU
+entry point:
 
 ```js
 const renderer = await createFluxelWebGpuBrowserRenderer({ canvas, wasm });
 renderer.start();
 ```
 
-`wasm` is the `fluxel-rendering-wasm` generated module. The WebGL2 factory uses
-`WebGl2Session.new(canvas)`; a wasm-bindgen constructor export and a test-only
-`createSession(canvas)` factory are also accepted. That WebGL2 session provides
-`resize`, `render_once`, parameterless `suspend`, `resume`, `context_lost`,
-`context_restored`, `dispose`, and `diagnostics_snapshot`.
+`wasm` is the generated `fluxel-rendering-wasm` module. The WebGL2 factory
+accepts its `WebGl2Session.new(canvas)` constructor (or the test-only
+`createSession(canvas)` form). The WebGPU factory requires the asynchronous
+`WebGpuSession.create(canvas)` entry point (or test-only
+`createWebGpuSession(canvas)`). Those exports are binding integration details:
+they do not establish browser session or token concepts in Fluxel's public
+rendering architecture.
 
-The adapter is the only submission-loop owner. JavaScript measures CSS size × DPR
-and reports that desired extent to Rust/WASM; Rust/WASM is the only code allowed
-to mutate the canvas drawing buffer. It stops before forwarding context loss,
-resumes only after Rust reports restoration, removes every observer/listener/RAF
-on dispose, and forwards diagnostics verbatim.
+## Lifecycle contract
 
-`requestFrame()` is a command which requests one future submission opportunity
-only while the continuous loop is stopped. It never submits synchronously and
-never becomes a query: `{ outcome: "scheduled" }`, `"already-scheduled"`,
-`"already-running"`, `"blocked"` with a reason, and terminal outcomes are explicit.
-Repeated one-shot requests coalesce into the single pending submission opportunity.
-`lastFrameReport()`
-is a pure query and never submits or schedules work. `scheduled` means only
-that the adapter accepted one opportunity; the eventual `submitted` or
-`backpressure` report is read through `lastFrameReport()`. A terminal recovery
-outcome retains the original error in its `error` field. It creates no scene,
-input, GPU, or host abstraction.
+The adapter observes CSS size and device-pixel ratio, then reports the desired
+pixel extent to the binding. JavaScript never mutates the canvas drawing
+buffer. It also reduces visibility, resize, WebGL context loss/restoration,
+and WebGPU device-loss/recovery outcomes into one browser lifecycle producer.
+It removes RAF callbacks, observers, and listeners on disposal.
 
-`createFluxelWebGpuBrowserRenderer` requires the async wasm-bindgen
-`WebGpuSession.create(canvas)` factory (a test-only injected
-`createWebGpuSession(canvas)` is also accepted). It never probes `navigator.gpu`
-or creates a WebGPU canvas context in JavaScript: those objects remain Rust/WASM
-private. It shares the DOM reducer but does not register WebGL context events.
-On the structured `{ outcome: "device-lost" }`, it stops RAF and starts at most
-one Rust `recover()` operation. Resize, visibility, `start`, and `resume` may
-update lifecycle state while recovery is pending but cannot submit a frame.
-Failed recovery stays stopped and is exposed as a terminal `requestFrame()`
-outcome; `dispose()` is async and repeat calls return the same terminal Promise.
-Its Rust session
-contract is `resize`, `render_once`, `suspend`, `resume`, `recover`, `dispose`,
-and `diagnostics_snapshot`; WebGL context event methods are not part of it.
+The returned adapter exposes:
 
-## v0.3.1 / 0.11 Architecture Closure
+| Method | Meaning |
+| --- | --- |
+| `start()` | Starts continuous frame opportunities when lifecycle state permits. |
+| `resize()` | Reports the current CSS × DPR extent to the binding. |
+| `requestFrame()` | Requests one future submission opportunity while the continuous loop is stopped. |
+| `lastFrameReport()` | Reads the most recent frame report without scheduling or submitting work. |
+| `suspend()` / `resume()` | Applies an explicit browser-side lifecycle pause or resume. |
+| `diagnosticsSnapshot()` | Returns diagnostics supplied by the binding unchanged. |
+| `dispose()` | Stops browser work and disposes the binding; it returns the same terminal result on repeated calls. |
 
-v0.3.1 is a compatibility patch to the browser adapter contribution to the
-ecosystem 0.11 Architecture Closure: a repeated pending one-shot request now
-reports `already-scheduled` instead of implying another future submission.
-The closed command/query and Rust/WASM-only drawing-buffer contracts otherwise
-remain unchanged. It does not replace or broaden the Stage 2.2 evidence claim.
-That historical v0.2.0 target remains one named Chrome Stable run on
-Windows x64 with the named AMD adapter, retained three-object scene, async
-loss-recovery, terminal disposal, CSS/DPR resize, and visibility lifecycle.
-Evidence for that target records the exact browser, OS, adapter, driver,
-diagnostics context, screenshots, and frame/pixel sampling.
+`requestFrame()` is a command, not a synchronous render call. Its result makes
+coalescing and blocked states explicit: `scheduled`, `already-scheduled`,
+`already-running`, `blocked`, or a terminal outcome. A `scheduled` result only
+means that the adapter accepted one future opportunity; inspect
+`lastFrameReport()` for its eventual rendering result.
 
-This is not a generic WebGPU support statement: it does not promise arbitrary
-browsers, GPUs, WebGPU feature sets, formats, adapters, or operating systems.
-No final commit SHA, evidence hash, or release result is asserted here; those
-belong to the version review and release evidence after the named run completes.
+For WebGPU, a `{ outcome: "device-lost" }` frame report stops RAF and initiates
+at most one binding recovery operation. While recovery is pending, lifecycle
+events may update desired state but cannot create another frame producer. A
+failed recovery remains terminal until disposal.
 
-`demo/` is a proof harness. Evidence tooling supplies a staged wasm-bindgen
-package at `demo/wasm/`; `window.__fluxelEvidence` is intentionally not a
-published package API.
+## Non-goals
+
+This package does not create a scene, define asset ownership, expose GPU
+objects, own RHI resources or synchronization, or provide input, audio, video,
+storage, or networking APIs. Those capabilities require their own proven
+platform contracts. The browser adapter provides platform lifecycle facts;
+`fluxel-rendering` owns GPU execution semantics.
+
+`demo/` is an integration and evidence harness. Its staged WASM package and
+`window.__fluxelEvidence` are not published package APIs.
