@@ -4,6 +4,8 @@
 rendering WASM binding. It is neither a JavaScript renderer nor a general SDK.
 It owns browser-side lifecycle reduction and the sole `requestAnimationFrame`
 producer; the rendering binding owns GPU execution and drawing-buffer changes.
+It depends on that rendering binding, not on `fluxel-host` or a native-host
+bridge.
 
 ## Use
 
@@ -71,6 +73,8 @@ objects, own RHI resources or synchronization, or provide input, audio, video,
 storage, or networking APIs. Those capabilities require their own proven
 platform contracts. The browser adapter provides platform lifecycle facts;
 `fluxel-rendering` owns the resulting rendering and GPU execution path.
+`fluxel-host` remains a peer native-platform component, not a browser adapter
+dependency.
 
 `demo/` is an integration and evidence harness. Its staged WASM package and
 `window.__fluxelEvidence` are not published package APIs.

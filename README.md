@@ -36,8 +36,10 @@ handles remain implementation details.
 
 `fluxel-host` and `fluxel-jsbridge` are peers that serve different platforms.
 Native applications may compose a host with rendering; browser and mini-game
-applications use a JavaScript adapter with a rendering binding. Neither choice
-makes platform lifecycle the owner of rendering semantics.
+applications use a JavaScript adapter with a rendering binding and do not
+depend on the native host. A future native JavaScript adapter may instead use a
+concrete native-host bridge and host runtime. Neither choice makes platform
+lifecycle the owner of rendering semantics.
 
 ## Package layout
 
@@ -56,11 +58,13 @@ behaviour is demonstrably part of that contract.
 
 ## Development boundary
 
-The dependency direction is from JavaScript platform adaptation toward the
-rendering binding. The bridge may supply a presentation target and lifecycle
-facts, but it does not define scenes, RenderGraph semantics, RHI resources,
-GPU synchronization, or renderer-private residency. Conversely, rendering
-does not own RAF, DOM events, browser policy, or a native application loop.
+Browser and mini-game adapters depend on their rendering binding, not on
+`fluxel-host`. Only a native JavaScript adapter, if introduced, may depend on
+a native-host bridge and host runtime. The bridge may supply a presentation
+target and lifecycle facts, but it does not define scenes, RenderGraph
+semantics, RHI resources, GPU synchronization, or renderer-private residency.
+Conversely, rendering does not own RAF, DOM events, browser policy, or a
+native application loop.
 
 For ecosystem ownership and the current development sequence, see the
 [Fluxel roadmap](https://github.com/fluxel-project/.github/blob/main/ROADMAP.md)
