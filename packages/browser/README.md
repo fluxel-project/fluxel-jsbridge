@@ -29,10 +29,9 @@ renderer.start();
 uses the binding's synchronous WebGL2 initialization path; the WebGPU factory
 uses its asynchronous WebGPU initialization path. Test-only injected creators
 exist for the DOM contract tests. These are binding integration details, not a
-Fluxel resource model: they do not establish browser session or token concepts
-in the public rendering architecture. The backend privately owns its browser
-context or device and all GPU objects; the public boundary carries lifecycle
-and presentation facts plus the binding's rendering results.
+Fluxel resource model. The backend privately owns its browser context or device
+and all GPU objects; the public boundary carries lifecycle and presentation
+facts plus the binding's rendering results.
 
 ## Lifecycle contract
 
@@ -71,7 +70,7 @@ This package does not create a scene, define asset ownership, expose GPU
 objects, own RHI resources or synchronization, or provide input, audio, video,
 storage, or networking APIs. Those capabilities require their own proven
 platform contracts. The browser adapter provides platform lifecycle facts;
-`fluxel-rendering` owns GPU execution semantics.
+`fluxel-rendering` owns the resulting rendering and GPU execution path.
 
 `demo/` is an integration and evidence harness. Its staged WASM package and
 `window.__fluxelEvidence` are not published package APIs.
