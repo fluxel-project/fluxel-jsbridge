@@ -26,12 +26,13 @@ renderer.start();
 ```
 
 `wasm` is the generated `fluxel-rendering-wasm` module. The WebGL2 factory
-accepts its `WebGl2Session.new(canvas)` constructor (or the test-only
-`createSession(canvas)` form). The WebGPU factory requires the asynchronous
-`WebGpuSession.create(canvas)` entry point (or test-only
-`createWebGpuSession(canvas)`). Those exports are binding integration details:
-they do not establish browser session or token concepts in Fluxel's public
-rendering architecture.
+uses the binding's synchronous WebGL2 initialization path; the WebGPU factory
+uses its asynchronous WebGPU initialization path. Test-only injected creators
+exist for the DOM contract tests. These are binding integration details, not a
+Fluxel resource model: they do not establish browser session or token concepts
+in the public rendering architecture. The backend privately owns its browser
+context or device and all GPU objects; the public boundary carries lifecycle
+and presentation facts plus the binding's rendering results.
 
 ## Lifecycle contract
 

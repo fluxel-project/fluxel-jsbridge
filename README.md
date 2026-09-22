@@ -7,8 +7,11 @@ capability facts into the contracts consumed by an application and by
 
 The repository currently ships the deliberately narrow
 [`@fluxel/browser`](./packages/browser/README.md) adapter. A general JavaScript
-SDK is introduced only when behaviour is genuinely shared by more than one
-adapter; this repository does not predeclare a universal application API.
+SDK core is a planned extraction, not a predeclared universal application API.
+It may be extracted only when a stable Rust-facing contract and at least one
+real adapter demonstrate a stable language-level boundary. Later adapters must
+validate that boundary without moving platform-specific behaviour into the
+core; multiple adapters are useful evidence, not a hard prerequisite.
 
 ## Responsibilities and boundaries
 
@@ -37,13 +40,15 @@ makes platform lifecycle the owner of rendering semantics.
 | Package area | Status | Responsibility |
 | --- | --- | --- |
 | `@fluxel/browser` | Existing | Browser canvas/DOM lifecycle adapter around an explicitly supplied rendering WASM binding. |
-| SDK core | Deferred | A language-level API only after multiple adapters establish a shared contract. |
-| Mini-game adapter | Deferred | An adapter for a specifically supported mini-game platform. |
-| Native adapter | Deferred | JavaScript adaptation over a concrete native-host bridge contract. |
+| SDK core | Planned | Extract only the language-level boundary proved by a stable Rust contract and a real adapter. |
+| Mini-game adapter | Planned | An adapter for a specifically supported mini-game platform. |
+| Native adapter | Planned | JavaScript adaptation over a concrete native-host bridge contract. |
 
 Platform services are capability-specific. An eventual common SDK must expose
-what the selected adapter actually supports rather than emulate unavailable
-input, audio, storage, video, or networking behaviour.
+only what the selected adapter and stable Rust contract actually support; it
+must not emulate unavailable input, audio, storage, video, or networking
+behaviour. A later adapter belongs behind its own package boundary until its
+behaviour is demonstrably part of that contract.
 
 ## Development boundary
 
