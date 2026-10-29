@@ -3,7 +3,8 @@
 `@fluxel/browser` is a narrow browser lifecycle adapter for a supplied Fluxel
 rendering WASM binding. It is neither a JavaScript renderer nor a general SDK.
 It owns browser-side lifecycle reduction and the sole `requestAnimationFrame`
-producer; the rendering binding owns GPU execution and drawing-buffer changes.
+producer; the supplied rendering binding coordinates frames through
+`fluxel-rhi`, whose backend owns GPU execution and drawing-buffer changes.
 It depends on that rendering binding, not on `fluxel-host` or a native-host
 bridge.
 
@@ -72,7 +73,8 @@ This package does not create a scene, define asset ownership, expose GPU
 objects, own RHI resources or synchronization, or provide input, audio, video,
 storage, or networking APIs. Those capabilities require their own proven
 platform contracts. The browser adapter provides platform lifecycle facts;
-`fluxel-rendering` owns the resulting rendering and GPU execution path.
+`fluxel-rendering` owns the resulting scene and RenderGraph path;
+`fluxel-rhi` owns the GPU execution contract and backends.
 `fluxel-host` remains a peer native-platform component, not a browser adapter
 dependency.
 
