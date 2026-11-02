@@ -8,7 +8,7 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
-    "test": "node --test packages/browser/test/*.test.js"
+    "test": "node --test packages/browser/src/tests/*.test.js"
   },
   "engines": {
     "node": ">=20"
