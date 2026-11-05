@@ -65,3 +65,7 @@ and [S8 measured closure](https://github.com/fluxel-project/fluxel-rendering/blo
 do not validate this browser adapter, WebGPU/WebGL, browser visibility, canvas
 restoration, or JavaScript bindings. Browser lifecycle, loss/restore, and
 JavaScript evidence remain separate requirements.
+
+The later [Rendering maintenance review](https://github.com/fluxel-project/fluxel-rendering/blob/main/documents/s0-s8-review-follow-up.md)
+adds private Graph and native-consumer CPU gates; those checks do not execute
+browser sessions or provide new JSBridge acceptance evidence.
