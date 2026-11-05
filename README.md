@@ -57,10 +57,11 @@ For ecosystem ownership and the current development sequence, see the
 [Fluxel roadmap](https://github.com/fluxel-project/.github/blob/main/ROADMAP.md)
 and [ecosystem architecture](https://github.com/fluxel-project/.github/blob/main/ECOSYSTEM_ARCHITECTURE.md).
 
-## S6 evidence boundary
+## Rendering evidence boundary
 
-Rendering's bounded S6 MVP is an external-Rust-crate consumer result in the
-audited native DX12/WGL matrix; its [closure record](https://github.com/fluxel-project/fluxel-rendering/blob/c163db2362154fbb75289a6a5263312b69350d1e/documents/s6-typed-forward-closure.md)
-does not validate this browser adapter, WebGPU/WebGL, or any JavaScript binding.
-Browser lifecycle and loss/restore evidence remains separately required, and
-S7/S8 plus final full regression remain open.
+Rendering's bounded S7/S8 result is native Windows DX12/WGL consumer evidence
+only. Its [S7 historical closure](https://github.com/fluxel-project/fluxel-rendering/blob/main/documents/s7-deferred-closure.md)
+and [S8 measured closure](https://github.com/fluxel-project/fluxel-rendering/blob/main/documents/s8-measured-closure.md)
+do not validate this browser adapter, WebGPU/WebGL, browser visibility, canvas
+restoration, or JavaScript bindings. Browser lifecycle, loss/restore, and
+JavaScript evidence remain separate requirements.
